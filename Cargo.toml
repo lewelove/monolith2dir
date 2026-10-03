@@ -1,0 +1,33 @@
+[workspace]
+members = ["."]
+resolver = "3"
+
+[workspace.lints.clippy]
+all = { level = "deny", priority = -1 }
+pedantic = { level = "deny", priority = -1 }
+nursery = { level = "deny", priority = -1 }
+
+struct_excessive_bools = "allow"
+cargo_common_metadata = "allow"
+missing_errors_doc = "allow"
+missing_panics_doc = "allow"
+
+cognitive_complexity = "deny"
+fn_params_excessive_bools = "deny"
+
+[package]
+name = "monolith2dir"
+version = "0.1.0"
+edition = "2024"
+
+[lints]
+workspace = true
+
+[dependencies]
+anyhow = "1.0.104"
+blake3 = "1.8.7"
+clap = { version = "4.6.7", features = ["derive"] }
+data-url = "0.3.2"
+lol_html = "3.0.1"
+mime_guess = "2.0.5"
+regex = "1.13.1"
