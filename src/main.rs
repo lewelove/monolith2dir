@@ -10,6 +10,7 @@ use monolith2dir::{AssetStore, HtmlUnbundler};
 
 const ASSETS_DIR: &str = "assets";
 const SCRIPTS_DIR: &str = "scripts";
+const STYLES_DIR: &str = "styles";
 
 #[derive(Parser, Debug)]
 #[command(
@@ -23,13 +24,6 @@ struct Args {
 
     #[arg(short, long, help = "Output directory")]
     output: Option<PathBuf>,
-
-    #[arg(
-        long,
-        default_value = "0",
-        help = "Minimum byte size of inline scripts to extract"
-    )]
-    min_script_bytes: u32,
 
     #[arg(short, long, help = "Overwrite output directory if it exists")]
     force: bool,
@@ -74,10 +68,11 @@ fn main() -> Result<()> {
 
     let asset_store = Rc::new(RefCell::new(AssetStore::new(&output_dir, ASSETS_DIR)?));
     let script_store = Rc::new(RefCell::new(AssetStore::new(&output_dir, SCRIPTS_DIR)?));
+    let style_store = Rc::new(RefCell::new(AssetStore::new(&output_dir, STYLES_DIR)?));
     let unbundler = HtmlUnbundler::new(
         Rc::clone(&asset_store),
         Rc::clone(&script_store),
-        args.min_script_bytes,
+        Rc::clone(&style_store),
     );
 
     let clean_html = unbundler.unbundle(&html_content)?;
@@ -89,12 +84,17 @@ fn main() -> Result<()> {
 
     let asset_count = asset_store.borrow().asset_count();
     let script_count = script_store.borrow().asset_count();
+    let style_count = style_store.borrow().asset_count();
     eprintln!(
         "Extracted {asset_count} unique assets into {}/{ASSETS_DIR}",
         output_dir.display()
     );
     eprintln!(
         "Extracted {script_count} unique scripts into {}/{SCRIPTS_DIR}",
+        output_dir.display()
+    );
+    eprintln!(
+        "Extracted {style_count} unique styles into {}/{STYLES_DIR}",
         output_dir.display()
     );
     eprintln!("Saved clean HTML to {}", index_path.display());
