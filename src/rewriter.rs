@@ -14,6 +14,7 @@ pub struct HtmlUnbundler {
     script_store: Rc<RefCell<AssetStore>>,
     style_store: Rc<RefCell<AssetStore>>,
     css_url_re: Regex,
+    void_end_tag_re: Regex,
 }
 
 struct Pass1Data {
@@ -30,11 +31,14 @@ impl HtmlUnbundler {
     ) -> Self {
         let css_url_re = Regex::new(r#"url\(\s*['"]?(data:[^'")]+)['"]?\s*\)"#)
             .expect("invalid css regex");
+        let void_end_tag_re = Regex::new(r"(?i)</(meta|base|link|br|hr|img|input)>")
+            .expect("invalid void end tag regex");
         Self {
             asset_store,
             script_store,
             style_store,
             css_url_re,
+            void_end_tag_re,
         }
     }
 
@@ -162,6 +166,15 @@ impl HtmlUnbundler {
                 el.remove();
                 Ok(())
             }))
+            .append_element_content_handler(element!("meta", |el| {
+                if el
+                    .get_attribute("http-equiv")
+                    .is_some_and(|h| h.eq_ignore_ascii_case("content-security-policy"))
+                {
+                    el.remove();
+                }
+                Ok(())
+            }))
             .append_element_content_handler(element!("script", move |el| {
                 if let Some(Some(rel_path)) = script_items_el.borrow_mut().pop_front() {
                     el.set_inner_content("", ContentType::Html);
@@ -206,7 +219,11 @@ impl HtmlUnbundler {
         rewriter.write(html.as_bytes())?;
         rewriter.end()?;
 
-        Ok(String::from_utf8_lossy(&output).into_owned())
+        let unbundled = String::from_utf8_lossy(&output);
+        Ok(self
+            .void_end_tag_re
+            .replace_all(&unbundled, "")
+            .into_owned())
     }
 }
 
