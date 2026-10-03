@@ -27,6 +27,31 @@ impl AssetStore {
         })
     }
 
+    pub fn process_bytes(&mut self, bytes: &[u8], ext: &str) -> Option<String> {
+        if bytes.is_empty() {
+            return None;
+        }
+
+        let hash = blake3::hash(bytes);
+        let hash_bytes = *hash.as_bytes();
+        let hash_hex = hash.to_hex();
+
+        if let Some(rel_path) = self.dedup.get(&hash_bytes) {
+            return Some(rel_path.clone());
+        }
+
+        let filename = format!("{hash_hex}.{ext}");
+        let file_path = self.assets_dir.join(&filename);
+
+        if !file_path.exists() {
+            fs::write(&file_path, bytes).ok()?;
+        }
+
+        let rel_path = format!("{}/{}", self.assets_dir_name, filename);
+        self.dedup.insert(hash_bytes, rel_path.clone());
+        Some(rel_path)
+    }
+
     pub fn process_data_url(&mut self, raw_url: &str) -> Option<String> {
         let trimmed = raw_url.trim();
         let data_url = DataUrl::process(trimmed).ok()?;
@@ -35,26 +60,9 @@ impl AssetStore {
             return None;
         }
 
-        let hash = blake3::hash(&body);
-        let hash_bytes = *hash.as_bytes();
-        let hash_hex = hash.to_hex();
-
-        if let Some(rel_path) = self.dedup.get(&hash_bytes) {
-            return Some(rel_path.clone());
-        }
-
         let mime = data_url.mime_type();
         let ext = resolve_extension(&mime.type_, &mime.subtype);
-        let filename = format!("{hash_hex}.{ext}");
-        let file_path = self.assets_dir.join(&filename);
-
-        if !file_path.exists() {
-            fs::write(&file_path, &body).ok()?;
-        }
-
-        let rel_path = format!("{}/{}", self.assets_dir_name, filename);
-        self.dedup.insert(hash_bytes, rel_path.clone());
-        Some(rel_path)
+        self.process_bytes(&body, ext)
     }
 
     #[must_use]

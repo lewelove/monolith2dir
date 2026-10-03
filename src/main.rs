@@ -8,6 +8,9 @@ use std::rc::Rc;
 
 use monolith2dir::{AssetStore, HtmlUnbundler};
 
+const ASSETS_DIR: &str = "assets";
+const SCRIPTS_DIR: &str = "scripts";
+
 #[derive(Parser, Debug)]
 #[command(
     name = "monolith2dir",
@@ -21,8 +24,12 @@ struct Args {
     #[arg(short, long, help = "Output directory")]
     output: Option<PathBuf>,
 
-    #[arg(short, long, default_value = "assets", help = "Assets subfolder name")]
-    assets_dir_name: String,
+    #[arg(
+        long,
+        default_value = "0",
+        help = "Minimum byte size of inline scripts to extract"
+    )]
+    min_script_bytes: u32,
 
     #[arg(short, long, help = "Overwrite output directory if it exists")]
     force: bool,
@@ -65,11 +72,13 @@ fn main() -> Result<()> {
         )
     })?;
 
-    let store = Rc::new(RefCell::new(AssetStore::new(
-        &output_dir,
-        &args.assets_dir_name,
-    )?));
-    let unbundler = HtmlUnbundler::new(Rc::clone(&store));
+    let asset_store = Rc::new(RefCell::new(AssetStore::new(&output_dir, ASSETS_DIR)?));
+    let script_store = Rc::new(RefCell::new(AssetStore::new(&output_dir, SCRIPTS_DIR)?));
+    let unbundler = HtmlUnbundler::new(
+        Rc::clone(&asset_store),
+        Rc::clone(&script_store),
+        args.min_script_bytes,
+    );
 
     let clean_html = unbundler.unbundle(&html_content)?;
 
@@ -78,11 +87,15 @@ fn main() -> Result<()> {
         format!("Failed to write index file: {}", index_path.display())
     })?;
 
-    let asset_count = store.borrow().asset_count();
+    let asset_count = asset_store.borrow().asset_count();
+    let script_count = script_store.borrow().asset_count();
     eprintln!(
-        "Extracted {asset_count} unique assets into {}/{}",
-        output_dir.display(),
-        args.assets_dir_name
+        "Extracted {asset_count} unique assets into {}/{ASSETS_DIR}",
+        output_dir.display()
+    );
+    eprintln!(
+        "Extracted {script_count} unique scripts into {}/{SCRIPTS_DIR}",
+        output_dir.display()
     );
     eprintln!("Saved clean HTML to {}", index_path.display());
 
