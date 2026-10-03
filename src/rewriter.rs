@@ -41,43 +41,48 @@ impl HtmlUnbundler {
         let store = Rc::clone(&self.store);
         let mut output = Vec::with_capacity(html.len());
 
-        let settings = Settings::new().append_element_content_handler(element!(
-            "*[src], *[href], *[poster], *[srcset]",
-            move |el| {
-                if let Some(src) = el
-                    .get_attribute("src")
-                    .filter(|s| s.trim_start().starts_with("data:"))
-                    .and_then(|s| store.borrow_mut().process_data_url(&s))
-                {
-                    el.set_attribute("src", &src)?;
-                }
-
-                if let Some(href) = el
-                    .get_attribute("href")
-                    .filter(|s| s.trim_start().starts_with("data:"))
-                    .and_then(|s| store.borrow_mut().process_data_url(&s))
-                {
-                    el.set_attribute("href", &href)?;
-                }
-
-                if let Some(poster) = el
-                    .get_attribute("poster")
-                    .filter(|s| s.trim_start().starts_with("data:"))
-                    .and_then(|s| store.borrow_mut().process_data_url(&s))
-                {
-                    el.set_attribute("poster", &poster)?;
-                }
-
-                if let Some(srcset) =
-                    el.get_attribute("srcset").filter(|s| s.contains("data:"))
-                {
-                    let new_srcset = rewrite_srcset(&srcset, &mut store.borrow_mut());
-                    el.set_attribute("srcset", &new_srcset)?;
-                }
-
+        let settings = Settings::new()
+            .append_element_content_handler(element!("base", |el| {
+                el.remove();
                 Ok(())
-            }
-        ));
+            }))
+            .append_element_content_handler(element!(
+                "*[src], *[href], *[poster], *[srcset]",
+                move |el| {
+                    if let Some(src) = el
+                        .get_attribute("src")
+                        .filter(|s| s.trim_start().starts_with("data:"))
+                        .and_then(|s| store.borrow_mut().process_data_url(&s))
+                    {
+                        el.set_attribute("src", &src)?;
+                    }
+
+                    if let Some(href) = el
+                        .get_attribute("href")
+                        .filter(|s| s.trim_start().starts_with("data:"))
+                        .and_then(|s| store.borrow_mut().process_data_url(&s))
+                    {
+                        el.set_attribute("href", &href)?;
+                    }
+
+                    if let Some(poster) = el
+                        .get_attribute("poster")
+                        .filter(|s| s.trim_start().starts_with("data:"))
+                        .and_then(|s| store.borrow_mut().process_data_url(&s))
+                    {
+                        el.set_attribute("poster", &poster)?;
+                    }
+
+                    if let Some(srcset) =
+                        el.get_attribute("srcset").filter(|s| s.contains("data:"))
+                    {
+                        let new_srcset = rewrite_srcset(&srcset, &mut store.borrow_mut());
+                        el.set_attribute("srcset", &new_srcset)?;
+                    }
+
+                    Ok(())
+                }
+            ));
 
         let mut rewriter = HtmlRewriter::new(settings, |chunk: &[u8]| {
             output.extend_from_slice(chunk);
